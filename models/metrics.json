@@ -1,0 +1,445 @@
+{
+  "best": {
+    "C": 10,
+    "gamma": 0.01,
+    "pos_weight": 5,
+    "cv_pr_auc": 0.5383,
+    "threshold": 0.105,
+    "n_support": [
+      1192,
+      254
+    ],
+    "weight_scores": {
+      "3": 0.4959,
+      "5": 0.5383,
+      "10": 0.5363
+    },
+    "oof_pr_auc": 0.5205,
+    "oof_roc_auc": 0.9775
+  },
+  "grid": {
+    "C": [
+      0.3,
+      1,
+      3,
+      10,
+      30
+    ],
+    "gamma": [
+      0.003,
+      0.01,
+      0.03,
+      0.1,
+      0.3
+    ],
+    "pr_auc": [
+      [
+        0.5057,
+        0.5013,
+        0.4878,
+        0.4785,
+        0.4545
+      ],
+      [
+        0.5091,
+        0.5074,
+        0.4897,
+        0.4713,
+        0.4223
+      ],
+      [
+        0.515,
+        0.5287,
+        0.493,
+        0.4622,
+        0.3959
+      ],
+      [
+        0.5325,
+        0.5383,
+        0.4772,
+        0.4423,
+        0.3785
+      ],
+      [
+        0.5331,
+        0.5099,
+        0.4699,
+        0.4229,
+        0.3563
+      ]
+    ]
+  },
+  "comparison": [
+    {
+      "model": "SVM \u2014 RBF kernel (ours)",
+      "roc_auc": 0.9719,
+      "pr_auc": 0.6505,
+      "f1": 0.665,
+      "f2": 0.6832,
+      "precision": 0.6368,
+      "recall": 0.6959,
+      "specificity": 0.987,
+      "brier": 0.0174,
+      "tp": 135,
+      "fp": 77,
+      "fn": 59,
+      "tn": 5849,
+      "threshold": 0.105,
+      "onset_recall": 0.1449
+    },
+    {
+      "model": "Logistic Regression",
+      "roc_auc": 0.9764,
+      "pr_auc": 0.6647,
+      "f1": 0.6463,
+      "f2": 0.6513,
+      "precision": 0.6382,
+      "recall": 0.6546,
+      "specificity": 0.9879,
+      "brier": 0.0192,
+      "tp": 127,
+      "fp": 72,
+      "fn": 67,
+      "tn": 5854,
+      "threshold": 0.6,
+      "onset_recall": 0.1449
+    },
+    {
+      "model": "Linear SVM (no kernel)",
+      "roc_auc": 0.9762,
+      "pr_auc": 0.6596,
+      "f1": 0.6537,
+      "f2": 0.6754,
+      "precision": 0.6204,
+      "recall": 0.6907,
+      "specificity": 0.9862,
+      "brier": 0.0168,
+      "tp": 134,
+      "fp": 82,
+      "fn": 60,
+      "tn": 5844,
+      "threshold": 0.175,
+      "onset_recall": 0.1449
+    },
+    {
+      "model": "Persistence (today = tomorrow)",
+      "roc_auc": 0.8163,
+      "pr_auc": 0.4264,
+      "f1": 0.6443,
+      "f2": 0.6443,
+      "precision": 0.6443,
+      "recall": 0.6443,
+      "specificity": 0.9884,
+      "brier": 0.0225,
+      "tp": 125,
+      "fp": 69,
+      "fn": 69,
+      "tn": 5857,
+      "threshold": 0.5,
+      "onset_recall": 0.0
+    }
+  ],
+  "severe_recall": 0.8889,
+  "onset_days": 69,
+  "per_city": [
+    {
+      "city": "Delhi",
+      "coastal": 0,
+      "events": 47,
+      "detected": 33,
+      "false_alarms": 17,
+      "pr_auc": 0.7029
+    },
+    {
+      "city": "Mumbai",
+      "coastal": 1,
+      "events": 15,
+      "detected": 4,
+      "false_alarms": 11,
+      "pr_auc": 0.1966
+    },
+    {
+      "city": "Kolkata",
+      "coastal": 1,
+      "events": 37,
+      "detected": 28,
+      "false_alarms": 11,
+      "pr_auc": 0.8174
+    },
+    {
+      "city": "Chennai",
+      "coastal": 1,
+      "events": 1,
+      "detected": 1,
+      "false_alarms": 1,
+      "pr_auc": 0.5
+    },
+    {
+      "city": "Bangalore",
+      "coastal": 0,
+      "events": 0,
+      "detected": 0,
+      "false_alarms": 0,
+      "pr_auc": null
+    },
+    {
+      "city": "Hyderabad",
+      "coastal": 0,
+      "events": 0,
+      "detected": 0,
+      "false_alarms": 0,
+      "pr_auc": null
+    },
+    {
+      "city": "Ahmedabad",
+      "coastal": 0,
+      "events": 27,
+      "detected": 20,
+      "false_alarms": 10,
+      "pr_auc": 0.717
+    },
+    {
+      "city": "Pune",
+      "coastal": 0,
+      "events": 4,
+      "detected": 2,
+      "false_alarms": 3,
+      "pr_auc": 0.6083
+    },
+    {
+      "city": "Jaipur",
+      "coastal": 0,
+      "events": 15,
+      "detected": 10,
+      "false_alarms": 6,
+      "pr_auc": 0.6086
+    },
+    {
+      "city": "Lucknow",
+      "coastal": 0,
+      "events": 48,
+      "detected": 37,
+      "false_alarms": 18,
+      "pr_auc": 0.7695
+    }
+  ],
+  "per_year": [
+    {
+      "year": 2021,
+      "events": 13,
+      "detected": 7,
+      "false_alarms": 11,
+      "recall": 0.5385
+    },
+    {
+      "year": 2022,
+      "events": 63,
+      "detected": 35,
+      "false_alarms": 32,
+      "recall": 0.5556
+    },
+    {
+      "year": 2023,
+      "events": 28,
+      "detected": 21,
+      "false_alarms": 9,
+      "recall": 0.75
+    },
+    {
+      "year": 2024,
+      "events": 90,
+      "detected": 72,
+      "false_alarms": 25,
+      "recall": 0.8
+    }
+  ],
+  "calibration": [
+    {
+      "lo": 0.0,
+      "hi": 0.05,
+      "n": 5840,
+      "mean_p": 0.0036,
+      "observed": 0.008
+    },
+    {
+      "lo": 0.05,
+      "hi": 0.1,
+      "n": 68,
+      "mean_p": 0.068,
+      "observed": 0.1765
+    },
+    {
+      "lo": 0.1,
+      "hi": 0.2,
+      "n": 16,
+      "mean_p": 0.139,
+      "observed": 0.5625
+    },
+    {
+      "lo": 0.5,
+      "hi": 0.6,
+      "n": 25,
+      "mean_p": 0.5851,
+      "observed": 0.32
+    },
+    {
+      "lo": 0.6,
+      "hi": 0.7,
+      "n": 159,
+      "mean_p": 0.6312,
+      "observed": 0.6792
+    },
+    {
+      "lo": 0.7,
+      "hi": 0.8,
+      "n": 10,
+      "mean_p": 0.7251,
+      "observed": 0.9
+    }
+  ],
+  "importance": [
+    {
+      "feature": "dep_mean3",
+      "label": "3-day mean departure (\u00b0C)",
+      "mean": 0.3679,
+      "std": 0.0196
+    },
+    {
+      "feature": "margin",
+      "label": "IMD margin, persisted anomaly (\u00b0C)",
+      "mean": 0.3008,
+      "std": 0.0264
+    },
+    {
+      "feature": "hw_today",
+      "label": "Heatwave today (0/1)",
+      "mean": 0.2842,
+      "std": 0.0048
+    },
+    {
+      "feature": "dep",
+      "label": "Departure from normal today (\u00b0C)",
+      "mean": 0.1983,
+      "std": 0.0223
+    },
+    {
+      "feature": "margin3",
+      "label": "IMD margin, 3-day anomaly (\u00b0C)",
+      "mean": 0.123,
+      "std": 0.0188
+    },
+    {
+      "feature": "tmax_trend3",
+      "label": "3-day Tmax trend (\u00b0C)",
+      "mean": 0.0461,
+      "std": 0.0172
+    },
+    {
+      "feature": "app_tmax",
+      "label": "Feels-like max today (\u00b0C)",
+      "mean": 0.0274,
+      "std": 0.0154
+    },
+    {
+      "feature": "dtr",
+      "label": "Diurnal range Tmax\u2212Tmin (\u00b0C)",
+      "mean": 0.026,
+      "std": 0.0112
+    },
+    {
+      "feature": "coastal",
+      "label": "Coastal city (0/1)",
+      "mean": 0.0191,
+      "std": 0.0104
+    },
+    {
+      "feature": "wind_max",
+      "label": "Max wind speed (km/h)",
+      "mean": 0.0166,
+      "std": 0.0093
+    },
+    {
+      "feature": "rain7_log",
+      "label": "7-day rainfall log(1+mm)",
+      "mean": 0.0136,
+      "std": 0.0103
+    },
+    {
+      "feature": "normal_next",
+      "label": "Normal Tmax for tomorrow (\u00b0C)",
+      "mean": 0.0003,
+      "std": 0.0096
+    }
+  ],
+  "counts": {
+    "rows_total": 91320,
+    "cities": 10,
+    "years": "2000\u20132024",
+    "train": {
+      "rows": 32130,
+      "pos": 431,
+      "years": "2000\u20132020"
+    },
+    "test": {
+      "rows": 6120,
+      "pos": 194,
+      "years": "2021\u20132024"
+    },
+    "heatwave_days_all": 625,
+    "severe_days_all": 87,
+    "by_city": {
+      "Ahmedabad": 58,
+      "Bangalore": 0,
+      "Chennai": 6,
+      "Delhi": 174,
+      "Hyderabad": 13,
+      "Jaipur": 70,
+      "Kolkata": 117,
+      "Lucknow": 146,
+      "Mumbai": 30,
+      "Pune": 11
+    },
+    "by_year": {
+      "2000": 2,
+      "2001": 6,
+      "2002": 42,
+      "2003": 27,
+      "2004": 17,
+      "2005": 36,
+      "2006": 5,
+      "2007": 13,
+      "2008": 1,
+      "2009": 45,
+      "2010": 76,
+      "2011": 2,
+      "2012": 43,
+      "2013": 3,
+      "2014": 31,
+      "2015": 7,
+      "2016": 10,
+      "2017": 10,
+      "2018": 15,
+      "2019": 30,
+      "2020": 10,
+      "2021": 13,
+      "2022": 63,
+      "2023": 28,
+      "2024": 90
+    },
+    "by_month": {
+      "1": 0,
+      "2": 0,
+      "3": 32,
+      "4": 118,
+      "5": 140,
+      "6": 287,
+      "7": 48,
+      "8": 0,
+      "9": 0,
+      "10": 0,
+      "11": 0,
+      "12": 0
+    }
+  }
+}

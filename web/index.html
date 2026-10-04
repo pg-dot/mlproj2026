@@ -1,0 +1,765 @@
+<title>Heatline</title>
+<meta name="description" content="Heatwave early warning for 10 Indian cities using a Support Vector Machine with an RBF kernel">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+/* Layout: an IMD-style forecast bulletin up top (inputs left, outlook right), then the kernel lab,
+   results, season replay and method as full-width bands on a cool instrument-grey ground. */
+:root{
+  --paper:#EEF1F4; --panel:#FFFFFF; --ink:#152231; --ink-2:#465567; --muted:#6E7C8C; --rule:#D3DAE2; --wash:#E3E8EE;
+  --cool:#2F6DB5; --heat:#C8432B; --cool-soft:#D9E5F4; --heat-soft:#F6DCD5;
+  --a-green:#2E7D4F; --a-yellow:#D9A400; --a-orange:#DE6E12; --a-red:#B8261F; --a-ink:#152231;
+  --focus:#2F6DB5;
+  --f-display:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-body:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-prose:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --r-s:6px; --r-m:10px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0E151D; --panel:#16202B; --ink:#E5ECF3; --ink-2:#B3BFCC; --muted:#8693A2; --rule:#2A3746; --wash:#1C2834;
+  --cool:#5B92D6; --heat:#E2694E; --cool-soft:#1E3550; --heat-soft:#4A2620;
+  --a-green:#3FA36A; --a-yellow:#E8BA2A; --a-orange:#F0842E; --a-red:#E0473E; --a-ink:#0E151D; --focus:#7FB0EA; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0E151D; --panel:#16202B; --ink:#E5ECF3; --ink-2:#B3BFCC; --muted:#8693A2; --rule:#2A3746; --wash:#1C2834;
+  --cool:#5B92D6; --heat:#E2694E; --cool-soft:#1E3550; --heat-soft:#4A2620;
+  --a-green:#3FA36A; --a-yellow:#E8BA2A; --a-orange:#F0842E; --a-red:#E0473E; --a-ink:#0E151D; --focus:#7FB0EA; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font:400 15px/1.55 var(--f-body);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:clamp(16px,3vw,32px)}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:-.01em}
+h1{font-size:clamp(30px,4.4vw,48px);font-weight:800;font-stretch:118%;line-height:1.02}
+h2{font-size:clamp(24px,3vw,34px);font-weight:800;font-stretch:115%;line-height:1.1}
+h3{font-size:17px;font-weight:700;font-stretch:105%}
+p{margin:0}
+.prose{font-family:var(--f-prose);font-size:17px;line-height:1.62;color:var(--ink-2);max-width:64ch}
+.small{font-size:13px;color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+a{color:var(--cool)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:3px}
+
+/* top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule)}
+.top .wrap{display:flex;align-items:center;gap:20px;min-height:56px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font:800 18px/1 var(--f-display);font-stretch:125%;color:var(--ink);text-decoration:none}
+.brand small{font:500 12px/1.2 var(--f-body);font-stretch:100%;color:var(--muted);display:block;margin-top:2px}
+nav{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+nav a{color:var(--ink-2);text-decoration:none;font-weight:600;font-size:14px;padding:6px 10px;border-radius:var(--r-s)}
+nav a:hover{background:var(--wash);color:var(--ink)}
+
+section{padding-block:56px;border-bottom:1px solid var(--rule)}
+.sec-head{display:grid;gap:12px;margin-bottom:28px}
+
+/* forecast hero */
+.hero{padding-block:36px 48px}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr);gap:28px;align-items:start}
+.lede{display:grid;gap:14px;margin-bottom:22px}
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-m)}
+.form{padding:20px;display:grid;gap:16px}
+.row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.row.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+label.f{display:grid;gap:4px;font-size:12.5px;font-weight:600;color:var(--ink-2)}
+input,select,button{font:inherit;color:inherit}
+input[type=number],input[type=date],select{width:100%;padding:8px 10px;border:1px solid var(--rule);border-radius:var(--r-s);background:var(--paper);font-variant-numeric:tabular-nums;font-size:15px}
+.unit{position:relative}.unit input{padding-right:44px}.unit span{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--muted);pointer-events:none}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--rule);background:var(--paper);border-radius:999px;padding:5px 11px;font-size:13px;cursor:pointer;color:var(--ink-2)}
+.chip:hover{border-color:var(--ink-2);color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{border:1px solid var(--ink);background:var(--ink);color:var(--paper);padding:9px 16px;border-radius:var(--r-s);font-weight:700;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink)}
+.note{font-size:13px;color:var(--ink-2);background:var(--wash);border-radius:var(--r-s);padding:8px 12px}
+
+/* bulletin */
+.bulletin{overflow:hidden;min-width:0}
+.b-body>*,.hero-grid>*,.vote{min-width:0}
+.b-band{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;background:var(--lvl,var(--a-green));color:var(--lvl-ink,#fff);flex-wrap:wrap}
+.b-band b{font:800 22px/1 var(--f-display);font-stretch:120%}
+.b-band span{font-weight:600;font-size:14px}
+.b-body{padding:20px;display:grid;gap:18px}
+.b-top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.b-city{font:800 28px/1.05 var(--f-display);font-stretch:112%}
+.b-date{color:var(--muted);font-size:14px}
+.prob{font:800 64px/0.9 var(--f-display);font-stretch:80%;font-variant-numeric:tabular-nums;text-align:right}
+.prob small{display:block;font:500 12.5px/1.3 var(--f-body);color:var(--muted);font-stretch:100%;margin-top:6px}
+.strip{position:relative;height:38px;margin-top:4px}
+.strip .bar{position:absolute;inset:8px 0 12px 0;border-radius:3px;display:flex;overflow:hidden}
+.strip .bar i{display:block;height:100%}
+.strip .mk{position:absolute;top:0;width:2px;height:30px;background:var(--ink);transform:translateX(-1px);transition:left .5s cubic-bezier(.2,.8,.2,1)}
+.strip .mk::after{content:"";position:absolute;left:-5px;top:-2px;border:6px solid transparent;border-top-color:var(--ink)}
+.strip .lab{position:absolute;bottom:-6px;font-size:11px;color:var(--muted);transform:translateX(-4px);white-space:nowrap}
+.kv{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:var(--r-s);overflow:hidden}
+.kv div{background:var(--panel);padding:10px 12px;display:grid;gap:2px}
+.kv dt{font-size:11.5px;color:var(--muted);margin:0}
+.kv dd{margin:0;font:700 18px/1.2 var(--f-display);font-variant-numeric:tabular-nums}
+.vote h3{margin-bottom:6px}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:700}
+.pill.hw{background:var(--heat-soft);color:var(--ink)}.pill.nm{background:var(--cool-soft);color:var(--ink)}
+.votes td,.votes th{padding:6px 8px}
+.votebar{display:grid;grid-template-columns:minmax(0,1fr) 2px minmax(0,1fr);align-items:center;height:26px;margin:10px 0 6px}
+.votebar .neg{justify-self:end;height:18px;background:var(--cool);border-radius:3px 0 0 3px}
+.votebar .pos{height:18px;background:var(--heat);border-radius:0 3px 3px 0}
+.votebar .zero{height:26px;background:var(--ink)}
+.vote-legend{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink-2);gap:10px}
+.truth{font-size:14px;padding:10px 12px;border-left:3px solid var(--ink-2);background:var(--wash);border-radius:0 var(--r-s) var(--r-s) 0}
+
+/* kernel lab */
+.lab-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:24px;align-items:start}
+.canvas-box{position:relative;padding:14px}
+canvas#kmap{width:100%;height:auto;display:block;border-radius:var(--r-s);cursor:crosshair;touch-action:none}
+.axis-x,.axis-y{font-size:12px;color:var(--muted)}
+.axis-x{text-align:center;margin-top:6px}
+.ctrl{padding:18px;display:grid;gap:18px}
+.slider{display:grid;gap:6px}
+.slider .hd{display:flex;justify-content:space-between;font-weight:700;font-size:14px}
+.slider .hd output{font-variant-numeric:tabular-nums;color:var(--ink-2)}
+input[type=range]{width:100%;accent-color:var(--ink)}
+.toggle{display:flex;gap:8px;align-items:center;font-size:14px;font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--ink-2)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.formula{font-family:var(--f-prose);font-size:19px;padding:12px 14px;background:var(--wash);border-radius:var(--r-s);overflow-x:auto;white-space:nowrap}
+.stat2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat2 div{border:1px solid var(--rule);border-radius:var(--r-s);padding:8px 12px}
+.stat2 b{display:block;font:800 22px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+.stat2 span{font-size:12px;color:var(--muted)}
+
+/* results */
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.card{padding:18px;display:grid;gap:10px;align-content:start;min-width:0}
+.card p.small{max-width:60ch}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{padding:9px 10px;text-align:right;border-bottom:1px solid var(--rule);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-size:12px;color:var(--muted);font-weight:600}
+tr.ours td{font-weight:700;background:var(--heat-soft)}
+td .best{border-bottom:2px solid var(--ink)}
+svg text{fill:var(--ink-2);font:12px var(--f-body)}
+svg .tick{stroke:var(--rule)}
+svg .axis{stroke:var(--muted)}
+.cm{display:grid;grid-template-columns:auto 1fr 1fr;gap:4px;font-size:13px;max-width:380px}
+.cm div{padding:12px;border-radius:var(--r-s);text-align:center;font-variant-numeric:tabular-nums}
+.cm .h{color:var(--muted);padding:4px;font-size:12px;align-self:center}
+.cm b{display:block;font:800 26px/1.1 var(--f-display)}
+.big{gap:6px}.big b{font:800 clamp(30px,4vw,42px)/1 var(--f-display);font-stretch:90%;font-variant-numeric:tabular-nums}.big span{font-size:14.5px;color:var(--ink-2)}
+details.tech{margin-top:20px}
+details.tech summary{cursor:pointer;padding:16px 18px;font-weight:700;font-size:16px}
+details.tech[open] summary{border-bottom:1px solid var(--rule)}
+.tech-body{padding:18px;display:grid;gap:24px}
+.sim-wrap h3{margin-bottom:10px}
+.sim{list-style:none;margin:0;padding:0;display:grid;gap:0;counter-reset:st}
+.sim li{counter-increment:st;position:relative;padding:0 0 18px 40px;transition:opacity .35s ease}
+.sim li::before{content:counter(st);position:absolute;left:0;top:-2px;width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--paper);font:800 14px/26px var(--f-display);text-align:center}
+.sim li:not(:last-child)::after{content:"";position:absolute;left:12.5px;top:28px;bottom:4px;width:1px;background:var(--rule)}
+.sim li .st{display:block;font-size:15px;margin-bottom:4px}
+.sim li p{font-size:14px;color:var(--ink-2);margin:0}
+.sim li.dim{opacity:.25}
+#miniMap{width:100%;height:auto;display:block;border:1px solid var(--rule);border-radius:var(--r-s);margin:4px 0 8px}
+.scale{margin:6px 0 8px}
+.imd{display:block;margin-top:8px;padding:8px 10px;background:var(--wash);border-radius:var(--r-s);line-height:1.7}
+.ck{display:inline-block;width:18px;font-weight:800}.ck.y{color:var(--a-green)}.ck.n{color:var(--a-red)}
+.scale-bar{position:relative;height:14px;border-radius:7px;background:linear-gradient(90deg,var(--cool-soft),var(--panel) 50%,var(--heat-soft));border:1px solid var(--rule)}
+.scale-bar .mid{position:absolute;left:50%;top:-4px;bottom:-4px;width:2px;background:var(--ink);transform:translateX(-1px)}
+.scale-bar .pin{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;background:var(--ink);border:3px solid var(--panel);transform:translate(-50%,-50%);transition:left .5s cubic-bezier(.2,.8,.2,1)}
+.scale-lab{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:4px}
+@media (prefers-reduced-motion:reduce){.sim li{transition:none}}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--paper);font-size:12.5px;padding:7px 10px;border-radius:var(--r-s);z-index:50;max-width:240px;line-height:1.4}
+
+/* replay */
+.replay-ctrl{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin-bottom:16px}
+.replay-ctrl label.f{min-width:150px}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:var(--r-s);overflow:hidden}
+.seg button{border:0;background:var(--panel);padding:8px 14px;cursor:pointer;font-weight:600;font-variant-numeric:tabular-nums}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.season-stats{display:flex;gap:22px;flex-wrap:wrap;font-size:14px;color:var(--ink-2)}
+.season-stats b{font:800 20px/1 var(--f-display);color:var(--ink);margin-right:4px}
+
+/* method */
+.steps{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;counter-reset:s}
+.steps li{counter-increment:s;padding:16px 16px 16px 52px;position:relative;background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-m)}
+.steps li::before{content:counter(s);position:absolute;left:16px;top:14px;font:800 22px/1 var(--f-display);color:var(--heat)}
+.steps h3{margin-bottom:4px}
+.steps p{font-size:14px;color:var(--ink-2)}
+.src{display:grid;gap:8px;padding-left:18px;margin:0}
+footer{padding-block:28px 48px;color:var(--muted);font-size:13px}
+code{font-size:13px;background:var(--wash);padding:1px 5px;border-radius:4px}
+pre{background:var(--wash);padding:12px 14px;border-radius:var(--r-s);overflow-x:auto;font-size:13px;margin:0}
+
+
+/* tabs */
+.tabs{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+.tabs button{border:0;background:transparent;padding:8px 14px;border-radius:var(--r-s);font-weight:700;font-size:14.5px;color:var(--ink-2);cursor:pointer}
+.tabs button:hover{background:var(--wash);color:var(--ink)}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--paper)}
+.tabpanel{padding-block:36px 56px;border-bottom:0}
+.block{margin-top:28px}
+.block>h3{font-size:20px;margin-bottom:6px}
+.block>p.small{margin-bottom:12px;max-width:72ch}
+.concepts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.concepts .card p{font-size:14.5px;color:var(--ink-2)}
+.concepts .tag{font-size:12px;font-weight:700;color:var(--heat)}
+.flow{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;counter-reset:fl}
+.flow li{counter-increment:fl;background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-m);padding:14px 14px 14px 48px;position:relative}
+.flow li::before{content:counter(fl);position:absolute;left:14px;top:12px;width:24px;height:24px;border-radius:50%;background:var(--ink);color:var(--paper);font:800 13px/24px var(--f-display);text-align:center}
+.flow h4{margin:0 0 4px;font-size:15px}
+.flow p{font-size:14px;color:var(--ink-2)}
+.kvt td:first-child{font-weight:600}
+.kvt td{white-space:normal;text-align:left}
+.kvt td:last-child{color:var(--ink-2)}
+.metric td{white-space:normal}
+.metric td:nth-child(2){font-weight:800;font-size:16px;white-space:nowrap}
+.metric td:last-child{text-align:left;color:var(--ink-2)}
+.worked{font-size:14px;color:var(--ink-2);background:var(--wash);border-radius:var(--r-s);padding:10px 12px;line-height:1.7}
+.worked code{background:var(--panel)}
+@media (max-width:900px){.concepts,.flow{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:900px){
+  .hero-grid,.lab-grid,.grid2{grid-template-columns:minmax(0,1fr)}
+  .grid3,.steps{grid-template-columns:minmax(0,1fr)}
+  .kv{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:520px){ .top{position:static} .row{grid-template-columns:repeat(2,minmax(0,1fr))} nav{margin-left:0} .prob{font-size:52px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#forecast" aria-label="Heatline home">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="6" fill="var(--heat)"/><g stroke="var(--heat)" stroke-width="2.2" stroke-linecap="round"><path d="M14 2v3M14 23v3M2 14h3M23 14h3M5.5 5.5l2.1 2.1M20.4 20.4l2.1 2.1M5.5 22.5l2.1-2.1M20.4 7.6l2.1-2.1"/></g></svg>
+      <span>Heatline<small>Heatwave early warning · SVM with RBF kernel</small></span>
+    </a>
+    <div class="tabs" role="tablist" aria-label="Pages">
+      <button role="tab" id="t-forecast" aria-controls="forecast" aria-selected="true">Forecast</button>
+      <button role="tab" id="t-model" aria-controls="model" aria-selected="false">Model details</button>
+      <button role="tab" id="t-kernel" aria-controls="kernel" aria-selected="false">RBF kernel</button>
+    </div>
+  </div>
+</header>
+
+<main>
+<!-- ========== FORECAST ========== -->
+<section class="hero" id="forecast" role="tabpanel" aria-labelledby="t-forecast">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="lede">
+        <h1>Will tomorrow be a heatwave day?</h1>
+        <p class="prose">Enter today's weather for one of ten Indian cities. A Support Vector Machine with a radial basis function kernel, trained on 21 summers of daily data, gives the chance that tomorrow meets the India Meteorological Department heatwave criteria.</p>
+      </div>
+      <form class="panel form" id="fform" autocomplete="off">
+        <div>
+          <div class="small" style="margin-bottom:6px">Pick a city and date to fill in the weather automatically, or load a real day from the 2021–2024 test years</div>
+          <div class="chips" id="presets"></div>
+        </div>
+        <div class="row two">
+          <label class="f" for="city">City<select id="city"></select></label>
+          <label class="f" for="today">Today's date<input type="date" id="today"></label>
+        </div>
+        <div class="row">
+          <label class="f" for="tmax_2">Max temp, 2 days ago<span class="unit"><input type="number" step="0.1" id="tmax_2"><span>°C</span></span></label>
+          <label class="f" for="tmax_1">Max temp, yesterday<span class="unit"><input type="number" step="0.1" id="tmax_1"><span>°C</span></span></label>
+          <label class="f" for="tmax">Max temp, today<span class="unit"><input type="number" step="0.1" id="tmax"><span>°C</span></span></label>
+          <label class="f" for="tmin">Min temp, today<span class="unit"><input type="number" step="0.1" id="tmin"><span>°C</span></span></label>
+          <label class="f" for="app_tmax">Feels-like max<span class="unit"><input type="number" step="0.1" id="app_tmax"><span>°C</span></span></label>
+          <label class="f" for="wind_max">Max wind<span class="unit"><input type="number" step="0.1" id="wind_max" min="0"><span>km/h</span></span></label>
+          <label class="f" for="rain7">Rain, last 7 days<span class="unit"><input type="number" step="0.1" id="rain7" min="0"><span>mm</span></span></label>
+        </div>
+        <div class="btns">
+          <button type="submit" class="btn">Run forecast</button>
+          <button type="button" class="btn ghost" id="liveBtn">Use today's weather</button>
+          <span class="small" id="engine">Model runs in your browser</span>
+        </div>
+        <p class="note" id="liveNote" hidden></p>
+      </form>
+    </div>
+
+    <article class="panel bulletin" aria-live="polite" id="bulletin">
+      <div class="b-band" id="band"><b id="lvl">Green</b><span id="action">—</span></div>
+      <div class="b-body">
+        <div class="b-top">
+          <div><div class="b-city" id="bCity">—</div><div class="b-date" id="bDate">—</div></div>
+          <div class="prob num"><span id="bProb">—</span><small>chance of a heatwave tomorrow</small></div>
+        </div>
+        <div class="strip" id="strip" aria-hidden="true"><div class="bar" id="stripBar"></div><div class="mk" id="stripMk"></div></div>
+        <div class="sim-wrap">
+          <h3>How the model decided</h3>
+          <ol class="sim" id="sim">
+            <li><b class="st">Read today's weather</b><p id="s1"></p></li>
+            <li><b class="st">Place today among past days</b>
+              <canvas id="miniMap" width="560" height="250" aria-label="Today's position among past days"></canvas>
+              <p id="s2"></p></li>
+            <li><b class="st">Let the remembered days vote</b>
+              <div class="scale" aria-hidden="true"><div class="scale-bar"><span class="mid"></span><span class="pin" id="sPin"></span></div><div class="scale-lab"><span>Normal</span><span>Boundary</span><span>Heatwave</span></div></div>
+              <p id="s3"></p></li>
+            <li><b class="st">Decide</b><p id="s4"></p></li>
+          </ol>
+        </div>
+        <div class="truth" id="truth" hidden></div>
+      </div>
+    </article>
+  </div>
+</section>
+
+
+<!-- ========== MODEL DETAILS ========== -->
+<section id="model" class="tabpanel" role="tabpanel" aria-labelledby="t-model" hidden>
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Model details</h2>
+      <p class="prose">How the heatwave model was built, the settings it uses, and how well it did on summers it had never seen.</p>
+    </div>
+
+    <div class="block">
+      <h3>How well it works</h3>
+      <p class="small" id="accLede"></p>
+      <div class="grid3" id="score"></div>
+    </div>
+
+    <div class="block">
+      <h3>How the model was trained</h3>
+      <ol class="flow">
+        <li><h4>Collect the data</h4><p id="fl1"></p></li>
+        <li><h4>Mark the heatwave days</h4><p>Each day is labelled with IMD's rule: at least 40 °C (37 °C on the coast) and at least 4.5 °C above normal, or 45 °C or more. The normal for each date is the 2000–2020 average.</p></li>
+        <li><h4>Set it up as a next-day warning</h4><p>Each row holds what is known on one evening, and the answer is whether the <b>next</b> day was a heatwave. Only March to July is used, the heatwave season.</p></li>
+        <li><h4>Turn weather into 12 inputs</h4><p>Raw readings become 12 numbers the model compares, such as how much hotter than normal it is and how close to the IMD limit. They are then rescaled so every input counts on the same scale.</p></li>
+        <li><h4>Split by years</h4><p id="fl5"></p></li>
+        <li><h4>Tune and train</h4><p id="fl6"></p></li>
+      </ol>
+    </div>
+
+    <div class="grid2 block">
+      <div class="panel card">
+        <h3>Model settings</h3>
+        <div class="tbl-wrap"><table class="kvt" id="settings"></table></div>
+      </div>
+      <div class="panel card">
+        <h3>The 12 inputs the model looks at</h3>
+        <p class="small">The first five matter most (measured by how much accuracy drops when each is scrambled).</p>
+        <div class="tbl-wrap"><table class="kvt" id="featTbl"></table></div>
+      </div>
+    </div>
+
+    <div class="grid2 block">
+      <div class="panel card">
+        <h3>Test results, 2021–2024</h3>
+        <p class="small">Each number counts city-days. Green boxes are right answers.</p>
+        <div id="cm"></div>
+      </div>
+      <div class="panel card">
+        <h3>All scores explained</h3>
+        <div class="tbl-wrap"><table class="metric" id="metricTbl"></table></div>
+      </div>
+    </div>
+
+    <div class="grid2 block">
+      <div class="panel card"><h3>Compared with simpler methods</h3><p class="small">Heatwave days caught out of 194, on the same test years. Grey number: false alarms.</p><div id="cmpBars"></div></div>
+      <div class="panel card"><h3>Heatwave days caught, by year</h3><p class="small">Red: warned the evening before. Outline: all heatwave days that year.</p><div id="yearChart"></div></div>
+    </div>
+
+    <div class="grid2 block">
+      <div class="panel card"><h3>ROC curve</h3><p class="small">How well the model ranks risky days above safe ones. Closer to the top-left corner is better; the dashed line is guessing. Area under it: <b id="rocAuc"></b>.</p><div id="rocChart"></div></div>
+      <div class="panel card"><h3>Precision–recall curve</h3><p class="small">Catching more heatwaves (right) costs more false alarms (down). The dot is the setting the forecast uses.</p><div id="prChart"></div></div>
+    </div>
+
+    <div class="panel card block">
+      <h3>Limits to keep in mind</h3>
+      <ul class="small" style="padding-left:18px;margin:0;display:grid;gap:6px;font-size:14px;color:var(--ink-2)">
+        <li>The data comes from Open-Meteo's weather reconstruction, which reads about 1–2 °C cooler than IMD thermometers on the hottest days, so it finds slightly fewer heatwaves.</li>
+        <li>IMD officially declares a heatwave only when two stations in a region qualify on two days in a row. This project labels each city on its own.</li>
+        <li>The first day of a heatwave is the hardest to call: the model caught <b id="onsetTxt"></b> of them. Adding weather-forecast inputs would help most.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ========== RBF KERNEL ========== -->
+<section id="kernel" class="tabpanel" role="tabpanel" aria-labelledby="t-kernel" hidden>
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>The RBF kernel, explained</h2>
+      <p class="prose">The technique is a Support Vector Machine (SVM) with a Radial Basis Function (RBF) kernel. Here is what each part does, and a live demo you can play with.</p>
+    </div>
+
+    <div class="concepts">
+      <div class="panel card"><span class="tag">The classifier</span><h3>SVM</h3><p>Sorts each day into one of two groups, heatwave next or normal next. It draws the boundary between the groups as far as possible from both, so new days near the edge are still sorted safely. It only remembers the past days near that boundary, called <b>support vectors</b>.</p></div>
+      <div class="panel card"><span class="tag">How it compares days</span><h3>Kernel</h3><p>A rule for measuring how similar two days are. The SVM never looks at the boundary directly: it asks the kernel how similar today is to each remembered day. Change the kernel and the shape of the boundary changes.</p></div>
+      <div class="panel card"><span class="tag">The kernel we use</span><h3>RBF</h3><p>Similarity = <code>exp(−γ × distance²)</code>. Two identical days score 1, very different days score close to 0. Because similarity fades with distance, the boundary can curve around the heatwave corner instead of being a straight line.</p></div>
+    </div>
+
+    <div class="block">
+      <h3>Straight line vs RBF kernel</h3>
+      <p class="small">Each dot is a real day from 2000–2020, placed by two of the model's inputs. Red: a heatwave came the next day. Blue: it did not. The shaded area is where the model would warn. Switch between the two to see what the kernel adds.</p>
+      <div class="lab-grid">
+        <div class="panel canvas-box">
+          <canvas id="kmap" width="640" height="520" aria-label="Past days and the model's warning zone"></canvas>
+          <div class="axis-x">Across: how much hotter than normal it is (°C). Up: temperature minus the IMD limit (°C).</div>
+        </div>
+        <div class="panel ctrl">
+          <div><div class="small" style="margin-bottom:6px">Type of boundary</div>
+            <div class="seg" id="kMode" role="group" aria-label="Type of boundary"><button type="button" data-m="lin" aria-pressed="false">Straight line (no kernel)</button><button type="button" data-m="rbf" aria-pressed="true">RBF kernel</button></div></div>
+          <div class="slider" id="gWrap"><div class="hd"><label for="gS">γ: how quickly similarity fades</label><output id="gO"></output></div><input type="range" id="gS" min="0" max="4" step="1" value="1"><span class="small">Small γ: far-away days still count, so the boundary is smooth. Large γ: only very close days count, so the boundary wraps around single dots and memorises them (overfitting).</span></div>
+          <div class="slider" id="cWrap"><div class="hd"><label for="cS">C: how strictly it avoids mistakes</label><output id="cO"></output></div><input type="range" id="cS" min="0" max="3" step="1" value="2"><span class="small">Small C allows a few dots on the wrong side for a simpler boundary. Large C tries to get every past day right.</span></div>
+          <div class="stat2"><div><b id="kAcc">—</b><span>past days on the correct side</span></div><div><b id="kSV">—</b><span>support vectors (remembered days)</span></div></div>
+          <label class="toggle" for="svT"><input type="checkbox" id="svT"> Circle the support vectors</label>
+          <div class="legend"><span><i style="background:var(--heat)"></i>Heatwave next day</span><span><i style="background:var(--cool)"></i>Normal next day</span><span><i style="background:var(--heat-soft);border-radius:2px"></i>Model warns here</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2 block">
+      <div class="panel card">
+        <h3>Try it: how similarity is calculated</h3>
+        <p class="small">Tap anywhere on the chart above to drop a test day (◆). Dots grow with their similarity to it. The most similar past day is worked out here.</p>
+        <div class="worked" id="worked">Tap the chart above to drop a test day.</div>
+      </div>
+      <div class="panel card">
+        <h3>Similarity fades with distance</h3>
+        <p class="small">RBF similarity between two days as they get further apart, for the γ chosen above. The dot marks the most similar past day to your test day.</p>
+        <div id="kcurve"></div>
+      </div>
+    </div>
+
+    <div class="panel card block">
+      <h3>From similarity to a decision</h3>
+      <p class="small">This is exactly what step 3 of the Forecast tab does, with all 12 inputs and 1,446 remembered days.</p>
+      <div class="formula">score = Σ (similarity to remembered day × its weight α × (+1 heatwave / −1 normal)) + bias</div>
+      <p class="small" style="margin-top:8px">Score above 0 means heatwave side, below 0 means normal side; 0 is the boundary. The weight α is learned in training and is capped by C. Platt scaling then turns the score into a percentage.</p>
+    </div>
+
+    <div class="grid2 block">
+      <div class="panel card">
+        <h3>Choosing C and γ for the real model</h3>
+        <p class="small">75 combinations of C, γ and heatwave weight were each tested 5 times, holding out whole years. Scores below are for weight 5:1 (higher is better). The outlined cell won.</p>
+        <div class="tbl-wrap" id="gridHeat"></div>
+      </div>
+      <div class="panel card">
+        <h3>Did the kernel help?</h3>
+        <div class="tbl-wrap"><table id="kernelGain"></table></div>
+        <p class="small" style="margin-top:8px">The RBF kernel catches more heatwaves at a similar false-alarm level. The gain over a straight line is modest because the inputs were designed to follow IMD's rule closely, which already makes the problem easier.</p>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+<footer><div class="wrap">Data: <a href="https://www.kaggle.com/datasets/developerghost/climate-in-india-daily-weather-data-2000-2024" target="_blank" rel="noopener">India Daily Weather 2000–2024 (Kaggle)</a>. Heatwave rules: <a href="https://internal.imd.gov.in/section/nhac/dynamic/FAQ_heat_wave.pdf" target="_blank" rel="noopener">IMD</a>. Model: <a href="https://scikit-learn.org/stable/modules/svm.html" target="_blank" rel="noopener">scikit-learn SVM</a> with an RBF kernel. A student project for use case KJS-CES-01, not an official IMD warning.</div></footer>
+<div class="tip" id="tip" hidden></div>
+
+<script src="js/svm.js"></script>
+<script>
+(async function(){
+const $ = s => document.querySelector(s);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = (v,d=1) => (v>=0?"":"−")+Math.abs(v).toFixed(d);
+const pct = v => (v*100).toFixed(1)+"%";
+const NS="http://www.w3.org/2000/svg";
+function el(tag,attrs={},parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+const tip=$("#tip");
+function showTip(ev,html){tip.innerHTML=html;tip.hidden=false;const x=Math.min(ev.clientX+14,innerWidth-250);tip.style.left=x+"px";tip.style.top=(ev.clientY+14)+"px";}
+function hideTip(){tip.hidden=true;}
+
+const [M,R,K] = await Promise.all(["data/model.json","data/results.json","data/kernel_demo.json"].map(u=>fetch(u).then(r=>r.json())));
+const svm = new HeatwaveSVM(M);
+const THR = M.threshold;
+const CITIES = Object.keys(M.cities);
+const LV = {Green:"--a-green",Yellow:"--a-yellow",Orange:"--a-orange",Red:"--a-red"};
+const LVBOUND = [[0,THR/2,"Green"],[THR/2,THR,"Yellow"],[THR,Math.max(.5,3*THR),"Orange"],[Math.max(.5,3*THR),1,"Red"]];
+
+/* ---------------- forecast ---------------- */
+const citySel=$("#city");
+CITIES.forEach(c=>{citySel.add(new Option(c+(M.cities[c].coastal?" (coastal)":""),c));});
+const fields=["tmax","tmax_1","tmax_2","tmin","app_tmax","rain7","wind_max"];
+let activePreset=null,currentTruth=null;
+let HIST=null;const histP=fetch("data/history.json").then(r=>r.ok?r.json():null).then(h=>HIST=h).catch(()=>null);
+const todayIST=()=>new Date(Date.now()+5.5*3600e3).toISOString().slice(0,10);
+$("#today").min="2000-01-03";$("#today").max=todayIST();
+const pbox=$("#presets");
+R.presets.forEach((p,i)=>{const b=document.createElement("button");b.type="button";b.className="chip";b.textContent=p.label;b.setAttribute("aria-pressed","false");b.onclick=()=>loadPreset(i);pbox.appendChild(b);});
+function clearChips(){activePreset=null;[...pbox.children].forEach(b=>b.setAttribute("aria-pressed","false"));}
+function loadPreset(i){
+  const p=R.presets[i];activePreset=p;
+  citySel.value=p.city;$("#today").value=p.today;fields.forEach(f=>$("#"+f).value=p.inp[f]);
+  currentTruth={city:p.city,today:p.today,date:p.date,tmax:p.tmax_next,hw:p.actual,severe:p.severe};
+  [...pbox.children].forEach((b,j)=>b.setAttribute("aria-pressed",j===i?"true":"false"));
+  setNote("");run();
+}
+function setNote(t){const n=$("#liveNote");n.hidden=!t;n.textContent=t;}
+function fromHistory(city,iso){
+  if(!HIST)return null;const H=HIST.cities[city];
+  const i=Math.round((hwDate.parseDate(iso)-hwDate.parseDate(HIST.start))/86400000);
+  if(i<2||i>=H.tmax.length)return null;
+  const v=(arr,j)=>arr[j]/10;
+  const inp={tmax:v(H.tmax,i),tmax_1:v(H.tmax,i-1),tmax_2:v(H.tmax,i-2),tmin:v(H.tmin,i),app_tmax:v(H.app,i),
+             rain7:H.rain.slice(Math.max(0,i-6),i+1).reduce((x,y)=>x+y,0)/10,wind_max:v(H.wind,i)};
+  let truth=null;
+  if(i+1<H.tmax.length){const nd=hwDate.addDays(hwDate.parseDate(iso),1);const tn=H.tmax[i+1]/10;const r=svm.isHeatwave(city,tn,tn-svm.normal(city,nd));
+    truth={city,today:iso,date:hwDate.iso(nd),tmax:tn,hw:r.hw,severe:r.severe};}
+  return {inp,truth};
+}
+const nice=iso=>hwDate.parseDate(iso).toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric",timeZone:"UTC"});
+let fillSeq=0;
+async function autoFill(){
+  const city=citySel.value,iso=$("#today").value;if(!iso)return;
+  const seq=++fillSeq;clearChips();currentTruth=null;
+  if(iso>todayIST()){setNote("Pick today or an earlier date. The model needs that day's measured weather.");return;}
+  await histP;if(seq!==fillSeq)return;
+  const h=fromHistory(city,iso);
+  if(h){fields.forEach(f=>$("#"+f).value=(+h.inp[f]).toFixed(1));currentTruth=h.truth;
+    setNote(`Filled with the measured weather in ${city} on ${nice(iso)}, from the Kaggle dataset.`);run();return;}
+  setNote(`Looking up the weather in ${city} on ${nice(iso)}…`);
+  let res=null,detail=null;
+  try{res=await fetch(`api/live/${encodeURIComponent(city)}?day=${iso}`);
+    if(!res.ok){try{detail=(await res.json()).detail;}catch(e){}}}catch(e){res=null;}
+  if(seq!==fillSeq)return;
+  if(res&&res.ok){const d=await res.json();fields.forEach(f=>$("#"+f).value=(+d.observations[f]).toFixed(1));
+    setNote(`Filled with real weather for ${city} on ${nice(iso)} from Open-Meteo.`+(iso===todayIST()?" Today's numbers are Open-Meteo's latest estimate and can still change before evening.":""));
+    $("#engine").textContent="Weather via the local server";run();return;}
+  if(detail&&typeof detail==="string"){setNote(detail+" You can also type the values in yourself.");return;}
+  setNote(`The bundled data ends on 31 December 2024. To fill in ${nice(iso)} automatically, run the project on your computer (uvicorn app.main:app) and open http://127.0.0.1:8000. It fetches real weather for any date from Open-Meteo. Or type the values in yourself and press Run forecast.`);
+}
+citySel.addEventListener("change",autoFill);
+$("#today").addEventListener("change",autoFill);
+fields.forEach(f=>$("#"+f).addEventListener("input",()=>{clearChips();currentTruth=null;}));
+// colour strip
+const sb=$("#stripBar");LVBOUND.forEach(([a,b,l])=>{const i=document.createElement("i");i.style.width=((b-a)*100)+"%";i.style.background=`var(${LV[l]})`;sb.appendChild(i);});
+[[THR,"warning threshold "+pct(THR).replace(".0","")]].forEach(([v,t])=>{const s=document.createElement("span");s.className="lab";s.style.left=(v*100)+"%";s.textContent="↑ "+t;$("#strip").appendChild(s);});
+
+function readInputs(){const o={};for(const f of fields){const v=parseFloat($("#"+f).value);if(!isFinite(v))return null;o[f]=v;}return o;}
+const MINI=K.combos["10|0.3"];
+function drawMini(dep,gap){
+  const c=$("#miniMap"),g=c.getContext("2d"),W=c.width,H=c.height,P={l:8,r:8,t:8,b:8};
+  const xs=K.x,ys=K.y,x0=xs[0],x1=xs[xs.length-1],y0=ys[0],y1=ys[ys.length-1];
+  const X=v=>P.l+(v-x0)/(x1-x0)*(W-P.l-P.r),Y=v=>H-P.b-(v-y0)/(y1-y0)*(H-P.t-P.b);
+  const fAt=(vx,vy)=>{const gx=Math.max(0,Math.min(xs.length-1.001,(vx-x0)/(x1-x0)*(xs.length-1))),gy=Math.max(0,Math.min(ys.length-1.001,(vy-y0)/(y1-y0)*(ys.length-1)));
+    const i=Math.floor(gx),j=Math.floor(gy),u=gx-i,v=gy-j,F=MINI.f;return F[j][i]*(1-u)*(1-v)+F[j][i+1]*u*(1-v)+F[j+1][i]*(1-u)*v+F[j+1][i+1]*u*v;};
+  g.fillStyle=css("--panel");g.fillRect(0,0,W,H);
+  g.fillStyle=css("--heat-soft");const step=2;
+  for(let py=P.t;py<H-P.b;py+=step)for(let px=P.l;px<W-P.r;px+=step){const vx=x0+(px-P.l)/(W-P.l-P.r)*(x1-x0),vy=y0+(H-P.b-py)/(H-P.t-P.b)*(y1-y0);if(fAt(vx,vy)>0)g.fillRect(px,py,step,step);}
+  K.points.forEach(p=>{g.globalAlpha=.75;g.beginPath();g.arc(X(p[0]),Y(p[1]),2.6,0,7);g.fillStyle=p[2]?css("--heat"):css("--cool");g.fill();});g.globalAlpha=1;
+  const cx=Math.max(P.l+8,Math.min(W-P.r-8,X(dep))),cy=Math.max(P.t+8,Math.min(H-P.b-8,Y(gap)));
+  g.fillStyle=css("--ink");g.strokeStyle=css("--panel");g.lineWidth=2.5;g.beginPath();g.moveTo(cx,cy-11);g.lineTo(cx+11,cy);g.lineTo(cx,cy+11);g.lineTo(cx-11,cy);g.closePath();g.stroke();g.fill();
+  g.font="700 13px Archivo, system-ui, sans-serif";g.textAlign=cx>W-90?"right":"left";const tx=cx+(cx>W-90?-15:15);g.lineWidth=4;g.strokeStyle=css("--panel");g.strokeText("Today",tx,cy+4);g.fillStyle=css("--ink");g.fillText("Today",tx,cy+4);
+  return fAt(Math.max(x0,Math.min(x1,dep)),Math.max(y0,Math.min(y1,gap)))>0;
+}
+let simTimer=[];
+function animateSim(){
+  const items=[...$("#sim").children];simTimer.forEach(clearTimeout);simTimer=[];
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches){items.forEach(li=>li.classList.remove("dim"));return;}
+  items.forEach((li,i)=>{if(i>0)li.classList.add("dim");});
+  items.forEach((li,i)=>{if(i>0)simTimer.push(setTimeout(()=>li.classList.remove("dim"),350*i));});
+}
+function render(city,today,res,source){
+  const a=svm.alert(res.p);
+  const band=$("#band");band.style.setProperty("--lvl",`var(${LV[a.level]})`);
+  band.style.setProperty("--lvl-ink",a.level==="Yellow"?"var(--a-ink)":"#fff");
+  $("#lvl").textContent=a.level+" alert";$("#action").textContent=a.action;
+  $("#bCity").textContent=city;
+  const fd=hwDate.parseDate(res.forecastFor);
+  $("#bDate").textContent="Outlook for "+fd.toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric",timeZone:"UTC"})+(source?" · "+source:"")+([3,4,5,6,7].includes(fd.getUTCMonth()+1)?"":" · outside the March–July heatwave season, so the risk is near zero");
+  $("#bProb").textContent=(res.p*100).toFixed(res.p<.1?1:0)+"%";
+  $("#stripMk").style.left=(res.p*100)+"%";
+  const x=res.x,thr=svm.threshold(city),inp=readInputs();
+  const normalToday=inp.tmax-x.dep, hotter=x.dep>=0;
+  const c1=inp.tmax>=thr,c2=x.dep>=4.5,c3=inp.tmax>=45,ok=v=>v?'<span class="ck y">✓</span>':'<span class="ck n">✗</span>';
+  $("#s1").innerHTML=`${city} reached <b>${inp.tmax.toFixed(1)} °C</b> today. The normal for this date is ${normalToday.toFixed(1)} °C (the average top temperature in ${city} around ${hwDate.parseDate(today).toLocaleDateString('en-IN',{day:'numeric',month:'long',timeZone:'UTC'})} over 2000–2020), so it was <b>${Math.abs(x.dep).toFixed(1)} °C ${hotter?"hotter":"cooler"}</b> than usual.
+    <span class="imd">IMD calls a day a heatwave only if <b>both</b> are true (or it reaches 45 °C):<br>
+    ${ok(c1)} At least ${thr} °C — today ${inp.tmax.toFixed(1)} °C<br>
+    ${ok(c2)} At least 4.5 °C above normal — today ${fmt(x.dep)} °C<br>
+    ${c3?ok(true)+" 45 °C or more — counts as a heatwave on its own<br>":""}
+    So today ${x.hw_today?"<b>is</b>":"is <b>not</b>"} a heatwave day. The model now predicts <b>tomorrow</b>.</span>`;
+  const inside=drawMini(x.dep,inp.tmax-thr);
+  const isHW=res.f>0;
+  $("#s2").innerHTML=`Each dot is a past day: red if a heatwave came the next day, blue if not. The shaded area is where heatwaves usually follow. Today (◆) lands <b>${inside?"inside":"outside"}</b> that area.`;
+  $("#sPin").style.left=(50+Math.max(-1,Math.min(1,res.f/4))*46)+"%";
+  let s3=`The model compares today with 1,446 past days it remembers. Days more like today get a bigger say. Their votes add up to a score of <b>${fmt(res.f,2)}</b>, which is ${isHW?"above":"below"} the boundary.`;
+  if(inside&&!isHW)s3+=" The full model also checks the 3-day trend, rain and wind, and these pulled the score below the line.";
+  $("#s3").innerHTML=s3;
+  const warnNow=res.p>=THR;
+  $("#s4").innerHTML=warnNow?(isHW?`Score above 0, so <b>heatwave expected tomorrow</b>. Chance ${pct(res.p)} → ${svm.alert(res.p).level} alert.`:`Score is just below 0 but very close to the line, so the chance (${pct(res.p)}) is still above the ${pct(THR)} warning level. <b>Warning issued</b> → ${svm.alert(res.p).level} alert.`)
+    :`Score below 0, so <b>no heatwave expected tomorrow</b>. Chance ${pct(res.p)} → ${svm.alert(res.p).level} alert.`;
+  animateSim();
+  const t=$("#truth");
+  const q=currentTruth;
+  if(q&&q.city===city&&q.today===today){
+    const hit=(res.p>=THR)===(q.hw===1);
+    t.hidden=false;t.style.borderLeftColor=hit?"var(--a-green)":"var(--a-red)";
+    t.innerHTML=`<b>What actually happened:</b> ${q.city} reached ${q.tmax.toFixed(1)} °C on ${nice(q.date)}, ${q.hw?(q.severe?"a severe heatwave day":"a heatwave day"):"not a heatwave day"}. The model's call was ${hit?"correct":"wrong"}.`;
+  } else t.hidden=true;
+}
+function run(source){
+  const inp=readInputs();if(!inp)return;
+  const city=citySel.value,today=$("#today").value;
+  render(city,today,svm.predict(city,today,inp),source);
+}
+$("#fform").addEventListener("submit",e=>{e.preventDefault();run();});
+$("#liveBtn").onclick=()=>{$("#today").value=todayIST();autoFill();};
+loadPreset(0);
+
+
+/* ================= tabs ================= */
+const TABS=["forecast","model","kernel"];
+function showTab(id,push){TABS.forEach(t=>{$("#"+t).hidden=t!==id;$("#t-"+t).setAttribute("aria-selected",t===id?"true":"false");});
+  if(push){try{history.replaceState(null,"","#"+id);}catch(e){}}window.scrollTo(0,0);}
+TABS.forEach(t=>$("#t-"+t).addEventListener("click",()=>showTab(t,true)));
+if(TABS.includes(location.hash.slice(1)))showTab(location.hash.slice(1),false);
+
+/* ================= model details ================= */
+const ours=R.comparison[0],POS=R.counts.test.pos,TOT=ours.tp+ours.fp+ours.fn+ours.tn,ACC=(ours.tp+ours.tn)/TOT;
+$("#accLede").textContent=`Tested once on ${TOT.toLocaleString("en-IN")} city-days from 2021–2024, years the model never saw while learning. Those summers had ${POS} heatwave days across the 10 cities.`;
+$("#score").innerHTML=[
+  [`${ours.tp} of ${POS}`,`heatwave days were warned the evening before (${pct(ours.recall)} recall)`],
+  [`${pct(ours.precision)}`,`of warnings turned out to be real heatwaves (precision)`],
+  [`${Math.round(R.severe_recall*100)}%`,`of severe heatwave days were caught`],
+].map(([n,t])=>`<div class="panel card big"><b>${n}</b><span>${t}</span></div>`).join("");
+$("#fl1").textContent=`${R.counts.rows_total.toLocaleString("en-IN")} rows from Kaggle: daily max, min and feels-like temperature, rain and wind for ${R.counts.cities} cities from 2000 to 2024, with no missing values.`;
+$("#fl5").innerHTML=`Learn from 2000–2020 (${R.counts.train.rows.toLocaleString("en-IN")} rows, ${R.counts.train.pos} heatwave). Test once on 2021–2024 (${R.counts.test.rows.toLocaleString("en-IN")} rows, ${R.counts.test.pos} heatwave). Splitting by year means the test is a real look into the future.`;
+$("#fl6").innerHTML=`75 setting combinations were tried with 5-fold cross-validation, holding out whole years each time. The best (C = ${R.best.C}, γ = ${R.best.gamma}, heatwave weight ${R.best.pos_weight}:1) was trained on all of 2000–2020.`;
+const nSV=R.best.n_support[0]+R.best.n_support[1];
+$("#settings").innerHTML=[
+  ["Algorithm","Support Vector Machine (scikit-learn SVC)"],
+  ["Kernel","RBF, similarity = exp(−γ × distance²)"],
+  ["C (mistake penalty)",R.best.C],
+  ["γ (gamma)",R.best.gamma],
+  ["Heatwave weight",`${R.best.pos_weight} : 1. Heatwave days are rare (about 1 in 75), so missing one costs 5 times more`],
+  ["Support vectors",`${nSV.toLocaleString("en-IN")} remembered days (${R.best.n_support[1]} heatwave, ${R.best.n_support[0]} normal)`],
+  ["Input scaling","StandardScaler: every input rescaled to mean 0, spread 1"],
+  ["Score to probability","Platt scaling"],
+  ["Warning threshold",`${pct(THR)} chance. Chosen to give the best balance of catches and false alarms during training`],
+  ["Tuning","Grid search over C, γ and weight; 5-fold cross-validation by year"],
+  ["Training data","2000–2020, March–July, 10 cities"],
+  ["Test data","2021–2024, never used in training"],
+].map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("");
+const FEAT_PLAIN={margin:["IMD margin, today","How far tomorrow would be from IMD's heatwave rule if today's heat continues"],
+  margin3:["IMD margin, 3 days","Same, using the last 3 days' average heat"],dep:["Hotter than normal, today","Today's max temperature minus the normal for the date"],
+  dep_mean3:["Hotter than normal, 3 days","Average of the last 3 days"],tmax_trend3:["3-day trend","Today's max minus the max 2 days ago"],
+  app_tmax:["Feels-like max","Temperature adjusted for humidity and wind"],dtr:["Day–night range","Max minus min; large means dry heat"],
+  rain7_log:["Rain, last 7 days","Recent rain cools the ground"],wind_max:["Max wind","Wind can bring or clear heat"],
+  normal_next:["Tomorrow's normal","How hot tomorrow usually is, i.e. the season"],hw_today:["Heatwave today","Heatwaves usually last several days"],
+  coastal:["Coastal city","Coastal cities use the 37 °C limit"]};
+const rank=Object.fromEntries(R.importance.map((x,i)=>[x.feature,i]));
+$("#featTbl").innerHTML=M.features.slice().sort((a,b)=>rank[a]-rank[b]).map((f,i)=>`<tr><td>${i+1}. ${FEAT_PLAIN[f][0]}</td><td>${FEAT_PLAIN[f][1]}</td></tr>`).join("");
+$("#cm").innerHTML=`<div class="cm"><div></div><div class="h">Heatwave came</div><div class="h">No heatwave</div>
+  <div class="h">Model warned</div><div style="background:color-mix(in srgb,var(--a-green) 18%,var(--panel))"><b>${ours.tp}</b>correct warnings</div><div style="background:var(--wash)"><b>${ours.fp}</b>false alarms</div>
+  <div class="h">No warning</div><div style="background:var(--wash)"><b>${ours.fn}</b>missed heatwaves</div><div style="background:color-mix(in srgb,var(--a-green) 18%,var(--panel))"><b>${ours.tn.toLocaleString("en-IN")}</b>correctly quiet</div></div>`;
+$("#metricTbl").innerHTML=[
+  ["Accuracy",pct(ACC),`All right answers ÷ all days. Looks high because most days are normal; saying "no heatwave" every day would already score ${pct(1-POS/TOT)}.`],
+  ["Recall",pct(ours.recall),"Share of real heatwave days that were warned."],
+  ["Precision",pct(ours.precision),"Share of warnings that were real heatwaves."],
+  ["F1 score",ours.f1.toFixed(3),"One number balancing recall and precision (0 to 1)."],
+  ["Specificity",pct(ours.specificity),"Share of normal days correctly left without a warning."],
+  ["ROC-AUC",ours.roc_auc.toFixed(3),"How well risky days are ranked above safe ones (1 = perfect, 0.5 = guessing)."],
+  ["PR-AUC",ours.pr_auc.toFixed(3),`Ranking quality for rare events. Guessing would score about ${R.pr.base_rate.toFixed(3)}.`],
+].map(([k,v,d])=>`<tr><td>${k}</td><td>${v}</td><td>${d}</td></tr>`).join("");
+$("#rocAuc").textContent=ours.roc_auc.toFixed(3);
+$("#onsetTxt").textContent=`${Math.round(ours.onset_recall*R.onset_days)} of ${R.onset_days}`;
+(function(){const names={"SVM — RBF kernel (ours)":"SVM with RBF kernel (ours)","Logistic Regression":"Logistic regression","Linear SVM (no kernel)":"SVM, straight line only","Persistence (today = tomorrow)":"Copy today: \u201ctomorrow = today\u201d"};
+  const w=420,rh=46,h=R.comparison.length*rh,m={r:70};const sv=el("svg",{viewBox:`0 0 ${w} ${h}`,width:"100%",role:"img"});
+  R.comparison.forEach((c,i)=>{const y=i*rh;const bw=c.tp/POS*(w-m.r);
+    el("text",{x:0,y:y+13,style:i===0?"font-weight:700;fill:var(--ink)":""},sv).textContent=names[c.model]||c.model;
+    el("rect",{x:0,y:y+19,width:w-m.r,height:16,rx:3,fill:"var(--wash)"},sv);
+    el("rect",{x:0,y:y+19,width:bw,height:16,rx:3,fill:i===0?"var(--heat)":"var(--muted)"},sv);
+    el("text",{x:bw+6>w-m.r-40?w-m.r+6:bw+6,y:y+32,style:"font-weight:700;fill:var(--ink)"},sv).textContent=c.tp;
+    el("text",{x:w-4,y:y+32,"text-anchor":"end"},sv).textContent=c.fp+" false";});
+  $("#cmpBars").appendChild(sv);})();
+(function(){const d=R.per_year,w=420,h=230,m={l:30,r:6,t:20,b:26};const mx=Math.max(...d.map(x=>x.events));const sv=el("svg",{viewBox:`0 0 ${w} ${h}`,width:"100%",role:"img"});
+  const bw=(w-m.l-m.r)/d.length;const Y=v=>h-m.b-v/mx*(h-m.t-m.b);
+  [0,Math.round(mx/2),mx].forEach(v=>{el("line",{x1:m.l,x2:w-m.r,y1:Y(v),y2:Y(v),class:"tick"},sv);el("text",{x:m.l-6,y:Y(v)+4,"text-anchor":"end"},sv).textContent=v;});
+  d.forEach((x,i)=>{const X=m.l+i*bw+bw*.2,W2=bw*.6;
+    el("rect",{x:X,y:Y(x.events),width:W2,height:h-m.b-Y(x.events),fill:"none",stroke:"var(--muted)","stroke-width":1.2,rx:2},sv);
+    el("rect",{x:X+3,y:Y(x.detected),width:W2-6,height:Math.max(0,h-m.b-Y(x.detected)),fill:"var(--heat)",rx:2},sv);
+    el("text",{x:X+W2/2,y:h-m.b+16,"text-anchor":"middle"},sv).textContent=x.year;
+    el("text",{x:X+W2/2,y:Y(x.events)-6,"text-anchor":"middle",style:"font-weight:700;fill:var(--ink)"},sv).textContent=`${x.detected} of ${x.events}`;});
+  $("#yearChart").appendChild(sv);})();
+function lineChart(host,{series,xlab,ylab,xd=[0,1],yd=[0,1],h=260,ref,xticks,yticks}){
+  host.innerHTML="";const w=520,m={l:46,r:14,t:12,b:40};const sv=el("svg",{viewBox:`0 0 ${w} ${h}`,width:"100%",role:"img"});
+  const X=v=>m.l+(v-xd[0])/(xd[1]-xd[0])*(w-m.l-m.r),Y=v=>h-m.b-(v-yd[0])/(yd[1]-yd[0])*(h-m.t-m.b);
+  (yticks||[0,.25,.5,.75,1]).forEach(v=>{el("line",{x1:m.l,x2:w-m.r,y1:Y(v),y2:Y(v),class:"tick"},sv);el("text",{x:m.l-6,y:Y(v)+4,"text-anchor":"end"},sv).textContent=v;});
+  (xticks||[0,.25,.5,.75,1]).forEach(v=>{el("text",{x:X(v),y:h-m.b+16,"text-anchor":"middle"},sv).textContent=v;});
+  el("text",{x:(m.l+w-m.r)/2,y:h-4,"text-anchor":"middle"},sv).textContent=xlab;
+  el("text",{x:12,y:(m.t+h-m.b)/2,"text-anchor":"middle",transform:`rotate(-90 12 ${(m.t+h-m.b)/2})`},sv).textContent=ylab;
+  if(ref)el("path",{d:ref.map((p,i)=>(i?"L":"M")+X(p[0])+" "+Y(p[1])).join(""),stroke:"var(--muted)","stroke-dasharray":"4 4",fill:"none"},sv);
+  series.forEach(se=>{el("path",{d:se.pts.map((p,i)=>(i?"L":"M")+X(p[0]).toFixed(1)+" "+Y(p[1]).toFixed(1)).join(""),stroke:se.color,"stroke-width":se.w||2,fill:"none","stroke-linejoin":"round"},sv);
+    if(se.dot)el("circle",{cx:X(se.dot[0]),cy:Y(se.dot[1]),r:5.5,fill:se.color,stroke:"var(--panel)","stroke-width":2},sv);});
+  host.appendChild(sv);}
+lineChart($("#rocChart"),{series:[{pts:R.roc.svm,color:"var(--heat)",w:2.5,dot:[ours.fp/(ours.fp+ours.tn),ours.recall]}],xlab:"False alarm rate",ylab:"Heatwaves caught",ref:[[0,0],[1,1]]});
+lineChart($("#prChart"),{series:[{pts:R.pr.svm,color:"var(--heat)",w:2.5,dot:[ours.recall,ours.precision]}],xlab:"Recall (heatwaves caught)",ylab:"Precision (warnings correct)"});
+
+/* ================= RBF kernel tab ================= */
+const cv=$("#kmap"),ctx=cv.getContext("2d");
+const KX=K.x,KY=K.y,NX=KX.length,NY=KY.length;
+const xmin=KX[0],xmax=KX[NX-1],ymin=KY[0],ymax=KY[NY-1];
+const GLAB=["Very slowly","Slowly","Medium","Quickly","Very quickly"];
+let probe=null,kmode="rbf";
+const W=cv.width,H=cv.height,pad={l:44,r:12,t:12,b:34};
+const sx=v=>pad.l+(v-xmin)/(xmax-xmin)*(W-pad.l-pad.r), sy=v=>H-pad.b-(v-ymin)/(ymax-ymin)*(H-pad.t-pad.b);
+const ix=px=>xmin+(px-pad.l)/(W-pad.l-pad.r)*(xmax-xmin), iy=py=>ymin+(H-pad.b-py)/(H-pad.t-pad.b)*(ymax-ymin);
+function hex(c){c=c.replace("#","");return [0,2,4].map(i=>parseInt(c.slice(i,i+2),16));}
+function key(){return kmode==="lin"?"linear":`${K.C[$("#cS").value]}|${K.gamma[$("#gS").value]}`;}
+function bil(f,x,y){const gx=(x-xmin)/(xmax-xmin)*(NX-1),gy=(y-ymin)/(ymax-ymin)*(NY-1);const i=Math.max(0,Math.min(NX-2,Math.floor(gx))),j=Math.max(0,Math.min(NY-2,Math.floor(gy)));const u=gx-i,v=gy-j;
+  return f[j][i]*(1-u)*(1-v)+f[j][i+1]*u*(1-v)+f[j+1][i]*(1-u)*v+f[j+1][i+1]*u*v;}
+function zs(p){return [(p[0]-K.mu[0])/K.sd[0],(p[1]-K.mu[1])/K.sd[1]];}
+function drawK(){
+  const k=key(),cmb=K.combos[k];const gamma=k==="linear"?null:+k.split("|")[1];
+  $("#gO").textContent=GLAB[$("#gS").value]+" (γ = "+K.gamma[$("#gS").value]+")";$("#cO").textContent="C = "+K.C[$("#cS").value];
+  $("#gWrap").hidden=$("#cWrap").hidden=kmode==="lin";
+  $("#kAcc").textContent=(cmb.acc*100).toFixed(1)+"%";$("#kSV").textContent=cmb.n_sv;
+  const warm=hex(css("--heat-soft")),bg=hex(css("--panel")),ink=hex(css("--ink"));
+  const img=ctx.createImageData(W,H),d=img.data;
+  for(let py=0;py<H;py++)for(let px=0;px<W;px++){
+    const o=(py*W+px)*4;let c=bg;
+    if(!(px<pad.l||px>W-pad.r||py<pad.t||py>H-pad.b)){const f=bil(cmb.f,ix(px),iy(py));c=Math.abs(f)<0.06?ink:(f>0?warm:bg);}
+    d[o]=c[0];d[o+1]=c[1];d[o+2]=c[2];d[o+3]=255;}
+  ctx.putImageData(img,0,0);
+  ctx.strokeStyle=css("--rule");ctx.lineWidth=1;ctx.strokeRect(pad.l+.5,pad.t+.5,W-pad.l-pad.r-1,H-pad.t-pad.b-1);
+  ctx.fillStyle=css("--muted");ctx.font="12px Archivo, system-ui, sans-serif";ctx.textAlign="center";
+  for(let v=-8;v<=10;v+=2)ctx.fillText(v,sx(v),H-pad.b+16);
+  ctx.textAlign="right";for(let v=-14;v<=8;v+=4)ctx.fillText(v,pad.l-6,sy(v)+4);
+  ctx.strokeStyle=css("--muted");ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(pad.l,sy(0));ctx.lineTo(W-pad.r,sy(0));ctx.moveTo(sx(4.5),pad.t);ctx.lineTo(sx(4.5),H-pad.b);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle=css("--ink-2");ctx.textAlign="left";ctx.fillText("IMD temperature limit",pad.l+6,sy(0)-6);ctx.fillText("4.5 °C above normal",sx(4.5)+5,H-pad.b-8);
+  let sim=null,best=-1;
+  if(probe&&gamma){const zp=zs(probe);sim=K.points.map(p=>{const z=zs(p),a=z[0]-zp[0],b=z[1]-zp[1];return Math.exp(-gamma*(a*a+b*b));});best=sim.indexOf(Math.max(...sim));}
+  const svset=new Set(cmb.sv),showSV=$("#svT").checked;
+  K.points.forEach((p,i)=>{
+    const r=sim?2.2+7*sim[i]:3.6;const X=sx(p[0]),Y=sy(p[1]);
+    ctx.globalAlpha=sim?(.3+.7*sim[i]):.9;
+    ctx.beginPath();ctx.arc(X,Y,r,0,7);ctx.fillStyle=p[2]?css("--heat"):css("--cool");ctx.fill();
+    ctx.lineWidth=1;ctx.strokeStyle=css("--panel");ctx.stroke();
+    if(showSV&&svset.has(i)){ctx.globalAlpha=1;ctx.beginPath();ctx.arc(X,Y,r+2.6,0,7);ctx.lineWidth=1.3;ctx.strokeStyle=css("--ink");ctx.stroke();}
+  });ctx.globalAlpha=1;
+  if(probe){const X=sx(probe[0]),Y=sy(probe[1]);
+    if(best>=0){const q=K.points[best];ctx.strokeStyle=css("--ink");ctx.lineWidth=1.5;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(X,Y);ctx.lineTo(sx(q[0]),sy(q[1]));ctx.stroke();ctx.setLineDash([]);}
+    ctx.fillStyle=css("--ink");ctx.beginPath();ctx.moveTo(X,Y-10);ctx.lineTo(X+10,Y);ctx.lineTo(X,Y+10);ctx.lineTo(X-10,Y);ctx.closePath();ctx.fill();}
+  // worked example + curve
+  const g=gamma||K.gamma[$("#gS").value];
+  let dot=null;
+  if(probe&&!gamma){$("#worked").innerHTML=`Test day placed. Its side under a straight line: <b>${bil(cmb.f,probe[0],probe[1])>0?"heatwave":"normal"}</b>. A straight-line boundary has no idea of "similar days", so no similarity is calculated. Switch to RBF kernel to see it.`;}
+  else if(probe){const q=K.points[best],zp=zs(probe),zq=zs(q),dx=zq[0]-zp[0],dy=zq[1]-zp[1],d2=dx*dx+dy*dy,kv=Math.exp(-g*d2),fv=bil(cmb.f,probe[0],probe[1]);dot=[Math.sqrt(d2),kv];
+    $("#worked").innerHTML=`<b>Test day:</b> ${fmt(probe[0])} °C vs normal, ${fmt(probe[1])} °C vs IMD limit.<br>
+      <b>Most similar past day:</b> ${fmt(q[0])} °C and ${fmt(q[1])} °C (${q[2]?"heatwave came next":"normal next"}).<br>
+      1. Rescale both inputs, then distance² = (${fmt(dx,2)})² + (${fmt(dy,2)})² = <b>${d2.toFixed(3)}</b><br>
+      2. Similarity = exp(−γ × distance²) = exp(−${g} × ${d2.toFixed(3)}) = <b>${kv.toFixed(3)}</b> (1 means identical)<br>
+      3. Every past day gets a similarity like this; the SVM adds up the weighted votes and the test day lands on the <b>${fv>0?"heatwave":"normal"}</b> side.`;}
+  const xs=[...Array(61).keys()].map(i=>i*0.05);
+  lineChart($("#kcurve"),{series:[{pts:xs.map(x=>[x,Math.exp(-g*x*x)]),color:"var(--heat)",w:2.5,dot}],xlab:"Distance between two days (rescaled)",ylab:"Similarity",xd:[0,3],xticks:[0,.5,1,1.5,2,2.5,3]});
+}
+$("#kMode").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;kmode=b.dataset.m;[...$("#kMode").children].forEach(x=>x.setAttribute("aria-pressed",x===b?"true":"false"));drawK();});
+["gS","cS","svT"].forEach(id=>$("#"+id).addEventListener("input",drawK));
+cv.addEventListener("pointerdown",e=>{const r=cv.getBoundingClientRect();const px=(e.clientX-r.left)*W/r.width,py=(e.clientY-r.top)*H/r.height;
+  if(px<pad.l||py>H-pad.b||px>W-pad.r||py<pad.t)return;probe=[ix(px),iy(py)];drawK();});
+drawK();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>drawK());
+new MutationObserver(()=>drawK()).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+(function(){const gr=R.grid;let mx=-1,mn=9;gr.pr_auc.flat().forEach(v=>{mx=Math.max(mx,v);mn=Math.min(mn,v);});
+  let h=`<table><thead><tr><th>C \\ γ</th>${gr.gamma.map(v=>`<th>${v}</th>`).join("")}</tr></thead><tbody>`;
+  gr.C.forEach((c,i)=>{h+=`<tr><td><b>${c}</b></td>`+gr.pr_auc[i].map((v,j)=>{const t=(v-mn)/(mx-mn);const b=c===R.best.C&&gr.gamma[j]===R.best.gamma;
+    return `<td style="background:color-mix(in srgb,var(--heat) ${Math.round(8+t*55)}%,var(--panel));text-align:center;${b?"outline:2.5px solid var(--ink);outline-offset:-3px;font-weight:800":""}">${v.toFixed(3)}</td>`;}).join("")+"</tr>";});
+  $("#gridHeat").innerHTML=h+"</tbody></table>";})();
+(function(){const lin=R.comparison.find(c=>c.model.startsWith("Linear SVM"));const lab=K.combos["10|0.3"],ll=K.combos.linear;
+  $("#kernelGain").innerHTML=`<tr><th></th><th>Straight line</th><th>RBF kernel</th></tr>`+[
+    ["2-input demo above: past days on the correct side",pct(ll.acc),pct(lab.acc)],
+    ["Full model: heatwave days caught (of 194)",lin.tp,ours.tp],
+    ["Full model: F1 score",lin.f1.toFixed(3),ours.f1.toFixed(3)],
+    ["Full model: false alarms",lin.fp,ours.fp],
+  ].map(([k,a,b])=>`<tr><td style="text-align:left;white-space:normal">${k}</td><td>${a}</td><td><b>${b}</b></td></tr>`).join("");})();
+})();
+</script>
